@@ -1,33 +1,14 @@
 import re
 from collections import defaultdict, namedtuple
 import xml.etree.cElementTree as ET
+from zynq_regs import load_registers
+import sys
 
-
+registers_by_uniqueid = load_registers()
 registers = defaultdict(list)
-registers_by_uniqueid = {}
 
-register = namedtuple("Register", "mask name uniqueid description bit_start bit_end")
-register_with_addr = namedtuple("RegisterWithAddr", "addr mask name uniqueid description bit_start bit_end")
-
-root = ET.parse("zynqconfig/ps7regs/sw_param.xml").getroot()
-
-for param in root.findall('parameter'):
-    name = param.findall('name')[0].text
-    uniqueid = param.get('uniqueid')
-    desc = param.findall('desc')[0].text
-
-    addr_start_end = param.findall('sw_param')[0]
-    addr = int(addr_start_end.get('offset'), 16)
-    bit_start = int(addr_start_end.get('start'), 10)
-    bit_end = int(addr_start_end.get('end'), 10)
-
-    mask = (2**(bit_start + 1) - 1) - (2**bit_end - 1)
-
-    registers[addr].append(register(mask, name, uniqueid, desc, bit_start, bit_end))
-    if uniqueid is registers_by_uniqueid:
-        print(f"dup id {uniqueid}")
-    registers_by_uniqueid[uniqueid] = register_with_addr(addr, mask, name, uniqueid, desc, bit_start, bit_end)
-
+for register in registers_by_uniqueid.values():
+    registers[register.addr].append(register)
 
 cmds = defaultdict(list)
 
@@ -41,7 +22,7 @@ cmd_exit = namedtuple("Exit", "")
 def get_args(string):
     return [int(arg.strip().replace("U", ""), 16) for arg in re.search(r".*\((.*)\)", string).group(1).split(",") if arg != ""]
 
-with open("pynqz2_ps7_init_gpl.c") as f:
+with open(sys.argv[1]) as f:
     in_group = False
 
     for line in f:
@@ -131,15 +112,8 @@ for name, cmd_list in cmds.items():
 
 order = ["ps7_mio_init_data_3_0", "ps7_pll_init_data_3_0" ,"ps7_clock_init_data_3_0" , "ps7_ddr_init_data_3_0", "ps7_peripherals_init_data_3_0", "ps7_post_config_3_0"]
 
-# for name in order:
-#     print(name)
-#     ecmds = expanded_commands[name]
-#     for cmd in ecmds:
-#         print(cmd)
-
-for uniqueid, reg in registers_by_uniqueid.items():
-    print(uniqueid + ":")
-    print("  addr:", hex(reg.addr))
-    print("  mask:", hex(reg.mask))
-    print("  name:", reg.name)
-    print("  description: |\n   ", "\n    ".join(reg.description.split("\n")))
+for name in order:
+    print(name)
+    ecmds = expanded_commands[name]
+    for cmd in ecmds:
+        print(cmd)

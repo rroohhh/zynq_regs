@@ -1,0 +1,4 @@
+zynqconfig
+*.c
+*.dump
+__pycache__
